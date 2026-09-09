@@ -1,11 +1,13 @@
 #!/bin/bash
 
-if [ $# -lt 2 ]; then
-    echo "Usage: $0 <filesdir> <searchstr>"
+if [ $# -lt 2 ]
+then
+    echo "Invalid Arguments"
     exit 1
 fi
 
-if [ ! -d "$1" ]; then
+if [ ! -d "$1" ]
+then
     echo "$1 is not a directory"
     exit 1
 fi
