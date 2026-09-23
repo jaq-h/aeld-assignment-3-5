@@ -72,25 +72,43 @@ bool do_exec(int count, ...)
     command[count] = NULL;
 
     fflush(stdout);
-
+    bool retVal = true;
     pid_t cpid = fork();
     if(cpid == -1){
-    	return false;
+    	retVal = false;
     }else if( cpid == 0){
-    	execv(command[0], command);
-    }else{
-	int waitID = waitpid(cpid, NULL, WUNTRACED | WCONTINUED);
-    	if(waitID == -1){
-	    return false;
+	int ex = execv(command[0], command);
+    	if(ex == -1){
+    		_exit(1);	
+        }else{
+		_exit(0);
 	}
-
+    }else{
+    	int wstatus; 
+	int waitID = waitpid(cpid, &wstatus, WUNTRACED | WCONTINUED);
+    	if(waitID == -1){
+		retVal = false;
+	}
+	if (WIFEXITED(wstatus)) {
+            printf("exited, status=%d\n", WEXITSTATUS(wstatus));
+            if (WEXITSTATUS(wstatus) != 0) {
+                retVal = false;
+            }
+        } else if (WIFSIGNALED(wstatus)) {
+            printf("killed by signal %d\n", WTERMSIG(wstatus));
+        } else if (WIFSTOPPED(wstatus)) {
+            printf("stopped by signal %d\n", WSTOPSIG(wstatus));
+        } else if (WIFCONTINUED(wstatus)) {
+            printf("continued\n");
+        }
     }
+    
 
 
 
     va_end(args);
 
-    return true;
+    return retVal;
 }
 
 /**
@@ -112,6 +130,7 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
     va_start(args, count);
     char * command[count+1];
     int i;
+    bool retVal = true;
     for(i=0; i<count; i++)
     {
         command[i] = va_arg(args, char *);
@@ -122,28 +141,47 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
 
  	 //from stackoverflow
     int rd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
-    int cpId = fork();
     if( rd < 0){
 	perror("open");	
 	return false;
     }
+
+    pid_t cpId = fork();
+
     if(cpId < 0 ){
 	    perror("fork");
-	    return false;
+	    retVal =  false;
     }
     else if(cpId == 0 ){
 	    if( dup2(rd,1) < 0 ){	
-    		    return false;
+    		    retVal = false;
 	    }else{
 		    close(rd);
 		    execv(command[0], command);
-		    return true;
+		    retVal = true;
 	    }
-    }else{
-	    return false;
+    }else{	  
+	int wstatus;
+   	pid_t w = waitpid(cpId, &wstatus, WUNTRACED | WCONTINUED);
+        if (w == -1) {
+            perror("waitpid");
+            retVal = false;
+        }
+        if (WIFEXITED(wstatus)) {
+            printf("exited, status=%d\n", WEXITSTATUS(wstatus));
+            if (WEXITSTATUS(wstatus) != 0) {
+                retVal = false;
+            }
+        } else if (WIFSIGNALED(wstatus)) {
+            printf("killed by signal %d\n", WTERMSIG(wstatus));
+        } else if (WIFSTOPPED(wstatus)) {
+            printf("stopped signal %d\n", WSTOPSIG(wstatus));
+        } else if (WIFCONTINUED(wstatus)) {
+            printf("continued\n");
+        }
     }
    
     va_end(args);
 
-    return true;
+    return retVal;
 }
